@@ -1,4 +1,4 @@
-"""IT helpdesk ticket allocator: raise, assign, note, close and save tickets."""
+"""IT helpdesk ticket allocator: raise, assign, note, close, save tickets."""
 import itertools
 import json
 import os
@@ -60,11 +60,13 @@ def unresolved_high_priority():
 
 def ping_user_machine(hostname):
     """Ping a host once, after checking the hostname is safe."""
-    if not re.fullmatch(r"[A-Za-z0-9.-]+", hostname) or hostname.startswith("-"):
+    valid = re.fullmatch(r"[A-Za-z0-9.-]+", hostname)
+    if not valid or hostname.startswith("-"):
         raise ValueError("Invalid hostname")
     count_flag = "-n" if sys.platform == "win32" else "-c"
     # Safe: no shell, fixed argument list, validated hostname.
-    return subprocess.call(["ping", count_flag, "1", hostname])  # nosec B603 B607
+    command = ["ping", count_flag, "1", hostname]
+    return subprocess.call(command)  # nosec B603 B607
 
 
 def save_tickets(file="tickets.json"):
@@ -85,7 +87,8 @@ def main():
     assign_ticket(t1, "Tech-Kiran")
     add_note(999, "Called user")
     print("Unassigned high priority:", unresolved_high_priority())
-    level = input("Urgency for a new laptop ticket (1-5, Enter for 3): ") or "3"
+    prompt = "Urgency for a new laptop ticket (1-5, Enter for 3): "
+    level = input(prompt) or "3"
     try:
         raise_ticket("sana", "laptop", level)
     except ValueError as error:
