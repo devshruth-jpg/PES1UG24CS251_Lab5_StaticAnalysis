@@ -1,11 +1,14 @@
 import json
-import subprocess
+import os
+import re
+import subprocess  # nosec B404 - used safely below (no shell, validated input)
+import sys
 from datetime import datetime
 
 # Global state
 tickets = {}
 ticket_counter = 100
-ADMIN_PASSWORD = "helpdesk@123"
+ADMIN_PASSWORD = os.environ.get("HELPDESK_ADMIN_PASSWORD")
 
 def raise_ticket(user, issue_type, urgency="3", audit_trail=[]):
     global ticket_counter
@@ -20,12 +23,14 @@ def assign_ticket(ticket_id, technician):
 def add_note(ticket_id, note):
     try:
         tickets[ticket_id]["notes"].append(note)
-    except:
-        pass
+    except KeyError:
+        print("Cannot add note: ticket", ticket_id, "does not exist")
 
 def close_ticket(ticket_id, password):
-    if password == ADMIN_PASSWORD:
+    if ADMIN_PASSWORD and password == ADMIN_PASSWORD:
         del tickets[ticket_id]
+    else:
+        print("Cannot close ticket", ticket_id, "- wrong password or not set")
 
 def unresolvedHighPriority():
     result = []
@@ -35,7 +40,10 @@ def unresolvedHighPriority():
     return result
 
 def ping_user_machine(hostname):
-    return subprocess.call("ping -c 1 " + hostname, shell=True)
+    if not re.fullmatch(r"[A-Za-z0-9.-]+", hostname) or hostname.startswith("-"):
+        raise ValueError("Invalid hostname")
+    count_flag = "-n" if sys.platform == "win32" else "-c"
+    return subprocess.call(["ping", count_flag, "1", hostname])  # nosec B603 B607
 
 def save_tickets(file="tickets.json"):
     f = open(file, "w")
@@ -51,7 +59,7 @@ def main():
     print("Unassigned high priority:", unresolvedHighPriority())
     level = input("Urgency for a new laptop ticket (1-5, Enter for 3): ") or "3"
     raise_ticket("sana", "laptop", level)
-    close_ticket(t3, "helpdesk@123")
+    close_ticket(t3, os.environ.get("HELPDESK_ADMIN_PASSWORD", ""))
     save_tickets()
     print("Open tickets:", list(tickets.keys()))
 
